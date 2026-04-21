@@ -17,7 +17,7 @@ const schema = z.object({
   SOLANA_COMMITMENT: z
     .enum(["processed", "confirmed", "finalized"])
     .default("confirmed"),
-  NETWORK: z.enum(["devnet", "mainnet"]).default("devnet"),
+  NETWORK: z.enum(["devnet", "mainnet", "mainnet-beta"]).default("devnet"),
   KEEPER_KEYPAIR: z.string().min(32),
   CARNOT_API_URL: z.string().url(),
   CARNOT_INTERNAL_API_KEY: z.string().min(16),
