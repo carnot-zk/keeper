@@ -117,6 +117,11 @@ export async function submitSettlement(
     console.log(`Settlement submitted: ${tx}`);
     return tx;
   } catch (e: unknown) {
+    const msg = describeError(e);
+    if (msg.includes('AlreadySettled') || msg.includes('already in use')) {
+      console.log('Lost race — batch already settled by another keeper');
+      return null;
+    }
     throw e;
   }
 }
