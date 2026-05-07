@@ -26,7 +26,7 @@ export class BatchWatcher {
         const batch = config.BATCH_WINDOW_SECS;
         // Closed window end = floor(now/batch)*batch (not ceil: ceil skips the batch that just closed).
         // First window uses [0, batch) until now ≥ batch.
-        const closedWindowEnd = Math.ceil(now / batch) * batch;
+        const closedWindowEnd = Math.floor(now / batch) * batch;
         const windowEnd = closedWindowEnd === 0 ? batch : closedWindowEnd;
         const windowStart = windowEnd - batch;
 
