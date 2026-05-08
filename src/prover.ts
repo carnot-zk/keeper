@@ -17,8 +17,11 @@ import type {
 function getProverEnv(): NodeJS.ProcessEnv {
   const merged: NodeJS.ProcessEnv = { ...process.env };
 
-  merged.SP1_PROVER = config.SP1_PROVER;
-  if (merged.SP1_PROVER === "network") {
+  // SP1 SDK expects "cpu" for local proving; keeper config uses enum "local".
+  const proverMode =
+    config.SP1_PROVER === "local" ? "cpu" : config.SP1_PROVER;
+  merged.SP1_PROVER = proverMode;
+  if (proverMode === "network") {
     if (!merged.NETWORK_PRIVATE_KEY && config.SP1_PRIVATE_KEY) {
       merged.NETWORK_PRIVATE_KEY = config.SP1_PRIVATE_KEY;
     }
