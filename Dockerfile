@@ -1,38 +1,38 @@
-# Stage 1: Build SP1 prover binary
-FROM rust:1.78-slim AS sp1-builder
+FROM rust:bookworm AS rust-builder
+RUN apt-get update && apt-get install -y \
+  pkg-config libssl-dev clang lld curl git \
+  protobuf-compiler build-essential \
+  && rm -rf /var/lib/apt/lists/*
+RUN curl -L https://sp1.succinct.xyz | bash && /root/.sp1/bin/sp1up
+ENV PATH="/root/.sp1/bin:${PATH}"
+WORKDIR /build
+COPY circuit /build/circuit
+RUN cargo build --manifest-path /build/circuit/script/Cargo.toml --bin carnot --release
 
-RUN apt-get update && apt-get install -y curl git pkg-config libssl-dev && rm -rf /var/lib/apt/lists/*
+FROM node:22-bookworm AS node-builder
+WORKDIR /workspace
+COPY sdk/package.json sdk/package-lock.json ./sdk/
+WORKDIR /workspace/sdk
+RUN npm ci
+COPY sdk/ ./
+RUN npm run build
 
-# Install SP1 CLI
-RUN curl -L https://sp1.succinct.xyz | bash && \
-    /root/.sp1/bin/sp1up && \
-    cp /root/.sp1/bin/sp1-prove /usr/local/bin/sp1-prove
+WORKDIR /workspace
+COPY keeper/package.json keeper/package-lock.json ./keeper/
+WORKDIR /workspace/keeper
+RUN npm ci
+COPY keeper/ ./
+RUN npm run build && npm prune --omit=dev
 
-# Copy circuits and build
-WORKDIR /circuits
-# Note: carnot-circuits repo must be available at build time
-# In CI, mount or COPY the circuits source
-# For local builds: docker build --build-context circuits=../carnot-circuits .
-
-# Stage 2: Node.js keeper bot
-FROM node:20-alpine AS keeper
-
+FROM node:22-bookworm AS runner
+RUN apt-get update && apt-get install -y ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
-
-# Copy SP1 binary from builder stage
-COPY --from=sp1-builder /usr/local/bin/sp1-prove /usr/local/bin/sp1-prove
-RUN chmod +x /usr/local/bin/sp1-prove
-
-# Install dependencies
-COPY package.json yarn.lock* ./
-RUN yarn install --frozen-lockfile --production
-
-# Copy built source
-COPY dist/ ./dist/
-
+COPY --from=rust-builder /build/circuit/target/release/carnot /prover/carnot
+RUN chmod +x /prover/carnot
+COPY --from=node-builder /workspace/sdk /app/sdk
+COPY --from=node-builder /workspace/keeper /app/keeper
+WORKDIR /app/keeper
 ENV NODE_ENV=production
-ENV SP1_PROVER_BINARY=/usr/local/bin/sp1-prove
-
-EXPOSE 0
-
+ENV SP1_PROVER_BINARY=/prover/carnot
 CMD ["node", "dist/index.js"]
